@@ -1,6 +1,6 @@
 "use server";
 
-import { ID, InputFile, Query } from "node-appwrite";
+import { ID, Query } from "node-appwrite";
 
 import {
   BUCKET_ID,
@@ -60,20 +60,20 @@ export const registerPatient = async ({
   ...patient
 }: RegisterUserParams) => {
   try {
-    // Upload file ->  // https://appwrite.io/docs/references/cloud/client-web/storage#createFile
     let file;
     if (identificationDocument) {
-      const inputFile =
-        identificationDocument &&
-        InputFile.fromBlob(
-          identificationDocument?.get("blobFile") as Blob,
-          identificationDocument?.get("fileName") as string
-        );
+      const blob = identificationDocument?.get("blobFile") as Blob;
+      const fileName = identificationDocument?.get("fileName") as string;
 
-      file = await storage.createFile(BUCKET_ID!, ID.unique(), inputFile);
+      // Create file using blob directly
+      file = await storage.createFile(
+        BUCKET_ID!,
+        ID.unique(),
+        new File([blob], fileName)
+      );
     }
 
-    // Create new patient document -> https://appwrite.io/docs/references/cloud/server-nodejs/databases#createDocument
+    // Create new patient document
     const newPatient = await databases.createDocument(
       DATABASE_ID!,
       PATIENT_COLLECTION_ID!,
@@ -97,18 +97,12 @@ export const registerPatient = async ({
 export const getPatient = async (userId: string) => {
   try {
     const patients = await databases.listDocuments(
-      process.env.DATABASE_ID!,
-      process.env.PATIENT_COLLECTION_ID!
+      DATABASE_ID!,
+      PATIENT_COLLECTION_ID!,
+      [Query.equal("userId", [userId])]
     );
 
-
-    let res = null
-    for (var i = 0; i < patients.documents.length; i++){
-        if (userId == patients.documents[i].userId) res = patients.documents[i]
-    }
-
-
-    return parseStringify(res);
+    return parseStringify(patients.documents[0]);
   } catch (error) {
     console.error(
       "An error occurred while retrieving the patient details:",
